@@ -31,6 +31,7 @@ module CutOptimizerPlugin
             dims = [bounds.width, bounds.height, bounds.depth].map(&:to_cm).sort.reverse
             
             pieces << {
+              id: e.persistent_id,
               name: (e.name.nil? || e.name.strip.empty?) ? "Pieza" : e.name,
               length: dims[0],
               width: dims[1],

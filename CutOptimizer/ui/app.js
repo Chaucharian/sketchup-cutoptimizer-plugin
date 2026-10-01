@@ -35,6 +35,7 @@ function receivePieces(data) {
         let d1 = p.length * 10;
         let d2 = p.width * 10;
         return {
+            id: p.id,
             name: p.name,
             w: Math.min(d1, d2),
             h: Math.max(d1, d2)
@@ -130,9 +131,10 @@ function packAndDraw(pieces) {
         totalArea += (p.w * p.h);
         let key = `${p.name}_${Math.round(p.w)}_${Math.round(p.h)}`;
         if (!grouped[key]) {
-            grouped[key] = {name: p.name, w: Math.round(p.w), h: Math.round(p.h), qty: 1};
+            grouped[key] = {name: p.name, w: Math.round(p.w), h: Math.round(p.h), qty: 1, ids: [p.id]};
         } else {
             grouped[key].qty++;
+            grouped[key].ids.push(p.id);
         }
     });
 
@@ -148,6 +150,7 @@ function packAndDraw(pieces) {
         let ph = rotated ? piece.w : piece.h;
         
         board.rects.push({
+            id: piece.id,
             name: piece.name,
             x: fr.x,
             y: fr.y,
@@ -315,6 +318,8 @@ function packAndDraw(pieces) {
             rect.setAttribute("fill", pieceFill);
             rect.setAttribute("stroke", pieceStroke);
             rect.setAttribute("stroke-width", "2");
+            rect.id = "svg-rect-" + r.id;
+            rect.classList.add("cut-rect");
             
             g.style.cursor = "pointer";
             g.addEventListener("mouseenter", (e) => {
@@ -323,6 +328,7 @@ function packAndDraw(pieces) {
                 document.getElementById("tt-dims").innerText = `${Math.round(vw)} x ${Math.round(vh)} mm`;
                 tt.style.display = 'block';
                 rect.setAttribute("fill", pieceHover);
+                if(window.sketchup) window.sketchup.highlightParts(r.id.toString());
             });
             g.addEventListener("mousemove", (e) => {
                 const tt = document.getElementById("tooltip");
@@ -332,6 +338,7 @@ function packAndDraw(pieces) {
             g.addEventListener("mouseleave", () => {
                 document.getElementById("tooltip").style.display = 'none';
                 rect.setAttribute("fill", pieceFill);
+                if(window.sketchup) window.sketchup.clearHighlight();
             });
             
             const text = document.createElementNS(svgNS, "text");
@@ -391,8 +398,11 @@ function packAndDraw(pieces) {
     groupedArr.forEach(g => {
         let areaStr = ((g.w * g.h) / 1000000 * g.qty).toFixed(2);
         let perimStr = (((g.w + g.h) * 2) / 1000 * g.qty).toFixed(2);
+        let idsStr = g.ids.join(',');
         tableHTML += `
-          <tr>
+          <tr data-ids=",${idsStr}," class="cut-row" 
+              onmouseenter="if(window.sketchup) window.sketchup.highlightParts('${idsStr}')" 
+              onmouseleave="if(window.sketchup) window.sketchup.clearHighlight()">
             <td><strong>${g.name}</strong></td>
             <td>${g.h}</td>
             <td>${g.w}</td>
@@ -408,4 +418,46 @@ function packAndDraw(pieces) {
     document.getElementById('cut-list').innerHTML = tableHTML;
 
     document.getElementById('exportBtn').style.display = 'inline-block';
+}
+
+window.highlightFromSketchup = function(part_id) {
+    let isDark = document.body.classList.contains('dark');
+    let highlightColor = isDark ? "#3b82f6" : "#bfdbfe"; // Blue highlight
+    let pieceFill = isDark ? "#0a0a0a" : "#fff";
+    
+    // Reset SVG
+    document.querySelectorAll('.cut-rect').forEach(el => {
+        el.setAttribute('fill', pieceFill);
+    });
+    
+    // Highlight SVG
+    let rect = document.getElementById('svg-rect-' + part_id);
+    if(rect) {
+        rect.setAttribute('fill', highlightColor);
+        rect.scrollIntoView({behavior: "smooth", block: "center"});
+    }
+    
+    // Reset table rows
+    document.querySelectorAll('.cut-row').forEach(el => {
+        el.style.backgroundColor = '';
+    });
+    
+    // Highlight Table Row
+    let row = document.querySelector(`tr[data-ids*=",${part_id},"]`);
+    if(row) {
+        row.style.backgroundColor = isDark ? "#1e3a8a" : "#dbeafe";
+        if(!rect) row.scrollIntoView({behavior: "smooth", block: "center"});
+    }
+}
+
+window.clearHighlightFromSketchup = function() {
+    let isDark = document.body.classList.contains('dark');
+    let pieceFill = isDark ? "#0a0a0a" : "#fff";
+    
+    document.querySelectorAll('.cut-rect').forEach(el => {
+        el.setAttribute('fill', pieceFill);
+    });
+    document.querySelectorAll('.cut-row').forEach(el => {
+        el.style.backgroundColor = '';
+    });
 }
